@@ -58,7 +58,7 @@ neural_controller:
     default_joint_pos:
       [0.26, 0.0, -0.52, -0.26, 0.0, 0.52, 0.26, 0.0, -0.52, -0.26, 0.0, 0.52]
 
-    init_kps: [7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5]
+    init_kps: [7.5, 7.5, 0.0, 7.5, 7.5, 0.0, 7.5, 7.5, 0.0, 7.5, 7.5, 0.0]
     init_kds:
       [0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25]
 
@@ -69,16 +69,16 @@ neural_controller:
       [
         "position",
         "position",
+        "velocity",
         "position",
         "position",
+        "velocity",
         "position",
         "position",
+        "velocity",
         "position",
         "position",
-        "position",
-        "position",
-        "position",
-        "position",
+        "velocity",
       ]
 
     max_body_angle: 1.5
@@ -111,7 +111,7 @@ neural_controller_three_legged:
     default_joint_pos:
       [0.26, 0.0, -0.52, -0.26, 0.0, 0.52, 0.26, 0.0, -0.52, -0.26, 0.0, 0.52]
 
-    init_kps: [7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5]
+    init_kps: [7.5, 7.5, 0.0, 7.5, 7.5, 0.0, 7.5, 7.5, 0.0, 7.5, 7.5, 0.0]
     init_kds:
       [0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25]
 
@@ -122,16 +122,16 @@ neural_controller_three_legged:
       [
         "position",
         "position",
+        "velocity",
         "position",
         "position",
+        "velocity",
         "position",
         "position",
+        "velocity",
         "position",
         "position",
-        "position",
-        "position",
-        "position",
-        "position",
+        "velocity",
       ]
 
     max_body_angle: 1.5

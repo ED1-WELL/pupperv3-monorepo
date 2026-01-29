@@ -619,10 +619,19 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
         .at(params_.action_types.at(i))
         .get()
         .set_value((double)action_.at(i));
-    command_interfaces_map_.at(params_.joint_names.at(i))
-        .at("kp")
-        .get()
-        .set_value(params_.kps.at(i) * params_.gain_multiplier);
+
+    if (params_.action_types.at(i) == "velocity") {
+      command_interfaces_map_.at(params_.joint_names.at(i))
+          .at("kp")
+          .get()
+          .set_value(0.0);
+    } else {
+      command_interfaces_map_.at(params_.joint_names.at(i))
+          .at("kp")
+          .get()
+          .set_value(params_.kps.at(i) * params_.gain_multiplier);
+    }
+    // Always set Kd (acts as velocity gain/damping)
     command_interfaces_map_.at(params_.joint_names.at(i))
         .at("kd")
         .get()
