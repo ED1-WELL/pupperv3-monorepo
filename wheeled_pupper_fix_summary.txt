@@ -1,0 +1,42 @@
+WHEELED PUPPER V3 DEPLOYMENT FIX SUMMARY
+========================================
+
+1. SUMMARY OF FIXES
+-------------------
+A. Switched to Velocity Control (Configuration)
+   - Changed the control mode for the 4 wheel joints (leg_*_3) to 'velocity'.
+   - Why: Training policy outputs velocity for wheels; position control prevents driving.
+
+B. Enabled Free Rotation (Controller Code)
+   - Updated controller to force Stiffness (Kp) to 0.0 for velocity-mode joints.
+   - Preserved Damping (Kd) to allow velocity tracking.
+   - Why: Overrides any stiffness requested by the policy so wheels can spin freely.
+
+C. Fixed Startup & Limits (URDF/Robot Description)
+   - Disabled 'homing' for wheel joints (set torque threshold to -1.0).
+   - Expanded position limits to +/- 1000.0 radians.
+   - Why: Prevents startup hang (searching for hard stop) and allows continuous rotation.
+
+2. AFFECTED FILES
+-----------------
+1. ros2_ws/src/neural_controller/launch/config.yaml
+   - Modified 'action_types' and 'init_kps' for indices 2, 5, 8, 11.
+
+2. ros2_ws/src/neural_controller/src/neural_controller.cpp
+   - Added logic to force Kp=0 for velocity-controlled joints in `update()`.
+
+3. ros2_ws/src/pupper_v3_description/description/components.xacro
+   - Updated `leg_front_r_3`, `leg_front_l_3`, `leg_back_r_3`, `leg_back_l_3`:
+     - Set `homing_torque_threshold` to -1.0
+     - Set `position_min`/`max` to +/- 1000.0
+
+3. REBUILD INSTRUCTIONS
+-----------------------
+Run the following command from your 'ros2_ws' directory:
+
+    colcon build --packages-select neural_controller pupper_v3_description
+
+Then source your workspace and run your launch script:
+
+    source install/setup.bash
+    # (launch your command here)
