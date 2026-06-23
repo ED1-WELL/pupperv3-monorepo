@@ -2,6 +2,7 @@
 #include "sensor_msgs/msg/joy.hpp"
 #include <fcntl.h>
 #include <string>
+#include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
 
