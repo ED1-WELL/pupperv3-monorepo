@@ -222,6 +222,14 @@ def generate_launch_description():
         name="joy_util_node",
     )
 
+    usb_trigger_node = Node(
+        package="joy_utils",
+        executable="usb_trigger_controller",
+        parameters=[node_parameters],
+        output="both",
+        name="usb_trigger_node",
+    )
+
     camera_node = Node(
         package="camera_ros",
         executable="camera_node",
@@ -302,6 +310,7 @@ def generate_launch_description():
         imu_sensor_broadcaster_spawner,
         foxglove_bridge,
         joy_util_node,
+        usb_trigger_node,
         # joy_node,
         joy_linux_node,
         teleop_twist_joy_node,

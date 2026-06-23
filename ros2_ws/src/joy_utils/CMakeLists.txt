@@ -12,8 +12,9 @@ find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(controller_manager_msgs REQUIRED)
 
-# Add the executable
+# Add the executables
 add_executable(estop_controller src/estop_controller.cpp)
+add_executable(usb_trigger_controller src/usb_trigger_controller.cpp)
 
 # Link against ROS 2 libraries
 ament_target_dependencies(estop_controller
@@ -23,8 +24,13 @@ ament_target_dependencies(estop_controller
   controller_manager_msgs
 )
 
-# Install the executable
-install(TARGETS estop_controller
+ament_target_dependencies(usb_trigger_controller
+  rclcpp
+  sensor_msgs
+)
+
+# Install the executables
+install(TARGETS estop_controller usb_trigger_controller
   DESTINATION lib/${PROJECT_NAME}
 )
 
