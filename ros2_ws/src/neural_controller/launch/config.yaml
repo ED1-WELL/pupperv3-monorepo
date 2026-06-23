@@ -187,7 +187,7 @@ usb_trigger_node:
   ros__parameters:
     l2_axis_index: 2      # L2 analog trigger axis on PS5 DualSense via joy_linux
     l2_threshold: 0.0     # -1.0=fully released, +1.0=fully pressed; 0.0 = halfway
-    serial_port: "/dev/ttyUSB0"  # Arduino Nano CH340 serial port
+    serial_port: "/dev/arduino"  # Arduino Nano CH340 serial port (stable udev symlink)
     baud_rate: 9600
 
 # Forward command controllers for animation system
