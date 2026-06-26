@@ -92,7 +92,7 @@ private:
       return;
     }
 
-    bool now_triggered = msg->axes[l2_axis_index_] < l2_threshold_;
+    bool now_triggered = msg->axes[l2_axis_index_] > l2_threshold_;
     if (now_triggered != triggered_) {
       triggered_ = now_triggered;
       send_signal(triggered_);
