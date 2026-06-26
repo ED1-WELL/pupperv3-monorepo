@@ -2,8 +2,6 @@
 #include "sensor_msgs/msg/joy.hpp"
 #include <fcntl.h>
 #include <string>
-#include <sys/ioctl.h>
-#include <termios.h>
 #include <unistd.h>
 
 class UsbTriggerController : public rclcpp::Node {
@@ -43,7 +41,13 @@ public:
 
 private:
   void open_serial() {
-    serial_fd_ = open(serial_port_.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK);
+    // Configure port via stty — same method proven to work in manual testing.
+    // -hupcl prevents DTR drop on close; raw cs8 sets 8N1 mode.
+    std::string stty_cmd = "stty -F " + serial_port_ + " " +
+                           std::to_string(baud_rate_) + " -hupcl raw cs8 > /dev/null 2>&1";
+    system(stty_cmd.c_str());
+
+    serial_fd_ = open(serial_port_.c_str(), O_WRONLY | O_NOCTTY | O_NONBLOCK);
     if (serial_fd_ < 0) {
       RCLCPP_WARN(this->get_logger(),
                   "Could not open serial port %s — trigger signals will not "
@@ -51,26 +55,6 @@ private:
                   serial_port_.c_str());
       return;
     }
-
-    speed_t speed = B9600;
-    if (baud_rate_ == 115200) speed = B115200;
-    else if (baud_rate_ == 57600) speed = B57600;
-    else if (baud_rate_ == 38400) speed = B38400;
-    else if (baud_rate_ == 19200) speed = B19200;
-
-    struct termios tty {};
-    cfmakeraw(&tty);
-    cfsetospeed(&tty, speed);
-    cfsetispeed(&tty, speed);
-    tty.c_cflag |= (CLOCAL | CREAD);
-    tty.c_cflag &= ~HUPCL;
-    tcsetattr(serial_fd_, TCSANOW, &tty);
-
-    // Clear DTR to prevent Arduino reset
-    int flags = 0;
-    ioctl(serial_fd_, TIOCMGET, &flags);
-    flags &= ~TIOCM_DTR;
-    ioctl(serial_fd_, TIOCMSET, &flags);
 
     RCLCPP_INFO(this->get_logger(),
                 "Opened %s, waiting for Arduino boot...", serial_port_.c_str());
