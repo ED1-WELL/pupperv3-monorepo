@@ -34,7 +34,7 @@ public:
 
   ~UsbTriggerController() {
     if (serial_fd_ >= 0) {
-      send_signal(false);
+      send_signal(true);
       close(serial_fd_);
     }
   }
