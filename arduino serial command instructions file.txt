@@ -1,0 +1,66 @@
+ARDUINO SERIAL COMMAND INSTRUCTIONS
+=====================================
+
+ONE-TIME SETUP (only needs to be done once ever)
+-------------------------------------------------
+
+1. Create the udev rule so the Arduino always gets a stable device name:
+
+   sudo nano /etc/udev/rules.d/99-arduino.rules
+
+   Paste this line, then save and exit:
+   SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="7523", SYMLINK+="arduino"
+
+2. Apply the rule:
+
+   sudo udevadm control --reload-rules && sudo udevadm trigger
+
+
+LOG OUT AND BACK IN (only needs to be done once, to activate dialout group)
+----------------------------------------------------------------------------
+
+   exit
+
+Then SSH back into the Pi. After this, dialout is active in every terminal permanently.
+
+
+EVERY TIME YOU WANT TO TEST
+----------------------------
+
+1. Verify devices are ready:
+
+   ls -la /dev/arduino
+   ls /dev/input/js0
+
+   Both should exist before continuing.
+
+2. Terminal 1 - start the trigger node:
+
+source /opt/ros/jazzy/setup.bash && source ~/pupperv3-monorepo/ros2_ws/install/local_setup.bash
+ros2 run joy_utils usb_trigger_controller --ros-args -p serial_port:=/dev/arduino -p baud_rate:=9600 -p l2_axis_index:=2 -p l2_threshold:=0.0
+
+   Wait for: "Opened serial port /dev/arduino"
+   Then wait 2 more seconds for the Arduino to finish booting.
+
+3. Terminal 2 - start the joystick node:
+
+source /opt/ros/jazzy/setup.bash && source ~/pupperv3-monorepo/ros2_ws/install/local_setup.bash
+ros2 run joy_linux joy_linux_node --ros-args -p dev:=/dev/input/js0 -p autorepeat_rate:=50.0
+
+4. Hold L2 past halfway on the PS5 controller.
+   - Terminal 1 should print: Sent '1' to Arduino
+   - LED on pin 8 of the Arduino should turn ON
+
+5. Release L2.
+   - Terminal 1 should print: Sent '0' to Arduino
+   - LED should turn OFF
+
+
+NOTES
+-----
+- The Arduino Nano is on /dev/arduino (udev symlink to whatever ttyUSBx it gets assigned)
+- The PS5 DualSense controller is on /dev/input/js0
+- L2 axis index is 2, threshold is 0.0 (halfway = past halfway triggers it)
+- Arduino LED output is on pin 8
+- When running the full robot stack (robot.sh), the usb_trigger_node starts automatically
+  and uses the config at: ros2_ws/src/neural_controller/launch/config.yaml
