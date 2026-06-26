@@ -9,7 +9,7 @@ public:
   UsbTriggerController()
       : Node("usb_trigger_controller"), triggered_(false), serial_fd_(-1) {
     this->declare_parameter<int>("l2_axis_index", 2);
-    this->declare_parameter<double>("l2_threshold", 0.0);
+    this->declare_parameter<double>("l2_threshold", -0.9);
     this->declare_parameter<std::string>("serial_port", "/dev/ttyUSB0");
     this->declare_parameter<int>("baud_rate", 9600);
 
