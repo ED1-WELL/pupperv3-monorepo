@@ -43,7 +43,7 @@ public:
 
 private:
   void open_serial() {
-    serial_fd_ = open(serial_port_.c_str(), O_WRONLY | O_NOCTTY | O_NONBLOCK);
+    serial_fd_ = open(serial_port_.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK);
     if (serial_fd_ < 0) {
       RCLCPP_WARN(this->get_logger(),
                   "Could not open serial port %s — trigger signals will not "
@@ -52,27 +52,30 @@ private:
       return;
     }
 
-    struct termios tty {};
-    tcgetattr(serial_fd_, &tty);
-
     speed_t speed = B9600;
     if (baud_rate_ == 115200) speed = B115200;
     else if (baud_rate_ == 57600) speed = B57600;
     else if (baud_rate_ == 38400) speed = B38400;
     else if (baud_rate_ == 19200) speed = B19200;
 
+    struct termios tty {};
+    cfmakeraw(&tty);
     cfsetospeed(&tty, speed);
+    cfsetispeed(&tty, speed);
     tty.c_cflag |= (CLOCAL | CREAD);
-    tty.c_cflag &= ~HUPCL; // disable DTR drop on close — prevents Arduino reset
+    tty.c_cflag &= ~HUPCL;
     tcsetattr(serial_fd_, TCSANOW, &tty);
 
-    // Clear DTR now so the Arduino doesn't reset when we open the port
-    int flags;
+    // Clear DTR to prevent Arduino reset
+    int flags = 0;
     ioctl(serial_fd_, TIOCMGET, &flags);
     flags &= ~TIOCM_DTR;
     ioctl(serial_fd_, TIOCMSET, &flags);
 
-    RCLCPP_INFO(this->get_logger(), "Opened serial port %s", serial_port_.c_str());
+    RCLCPP_INFO(this->get_logger(),
+                "Opened %s, waiting for Arduino boot...", serial_port_.c_str());
+    sleep(2);
+    RCLCPP_INFO(this->get_logger(), "Arduino ready on %s", serial_port_.c_str());
   }
 
   void send_signal(bool on) {
