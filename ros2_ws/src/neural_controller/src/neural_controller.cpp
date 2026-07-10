@@ -123,11 +123,37 @@ controller_interface::CallbackReturn NeuralController::on_init() {
                   params_.observation_history);
     }
 
+    // Read behavior tag from policy JSON
+    if (j.find("behavior") != j.end() && !j["behavior"].is_null()) {
+      behavior_ = j["behavior"].get<std::string>();
+      RCLCPP_INFO(get_node()->get_logger(), "From JSON, setting behavior=%s", behavior_.c_str());
+    }
+
+    // Set runtime observation layout based on behavior
+    if (behavior_ == "leg_lift") {
+      // Layout: ang_vel[3], gravity[3], cmd_one_hot[5], joint_pos[12], last_action[12] = 35
+      single_obs_size_ = 35;
+      joint_pos_obs_idx_ = 11;   // 3 + 3 + 5
+      last_action_obs_idx_ = 23; // 11 + 12
+      if (j.find("command_states") != j.end()) {
+        leg_lift_num_states_ = static_cast<int>(j["command_states"].size());
+        for (const auto &s : j["command_states"]) {
+          leg_lift_cmd_states_.push_back(s.get<std::string>());
+        }
+      }
+      RCLCPP_INFO(get_node()->get_logger(), "leg_lift mode: %d command states, single_obs_size=%d",
+                  leg_lift_num_states_, single_obs_size_);
+    } else {
+      single_obs_size_ = kSingleObservationSize;
+      joint_pos_obs_idx_ = kJointPositionIdx;
+      last_action_obs_idx_ = kLastActionIdx;
+    }
+
     // Check that the observation history is consistent with the model input shape
-    if (j["in_shape"].at(1) != params_.observation_history * kSingleObservationSize) {
+    if (j["in_shape"].at(1) != params_.observation_history * single_obs_size_) {
       RCLCPP_ERROR(get_node()->get_logger(),
-                   "observation_history (%ld) * kSingleObservationSize (%d) != in_shape (%d)",
-                   params_.observation_history, kSingleObservationSize,
+                   "observation_history (%ld) * single_obs_size (%d) != in_shape (%d)",
+                   params_.observation_history, single_obs_size_,
                    static_cast<int>(j["in_shape"].at(1)));
       return controller_interface::CallbackReturn::ERROR;
     }
@@ -208,11 +234,32 @@ controller_interface::CallbackReturn NeuralController::on_activate(
   cmd_yaw_vel_ = 0.0;
 
   // Initialize the observation vector
-  observation_.resize(params_.observation_history * kSingleObservationSize, 0.0);
+  observation_.resize(params_.observation_history * single_obs_size_, 0.0);
 
   // Set the gravity z-component in the initial observation vector
   for (int i = 0; i < params_.observation_history; i++) {
-    observation_.at(i * kSingleObservationSize + kGravityZIndx) = -1.0;
+    observation_.at(i * single_obs_size_ + kGravityZIndx) = -1.0;
+  }
+
+  // For leg_lift, initialize the command one-hot to "stand" (index 0)
+  if (behavior_ == "leg_lift") {
+    observation_.at(6) = 1.0f;
+  }
+
+  // For leg_lift, subscribe to /joy for command state cycling (button 3 = Square)
+  if (behavior_ == "leg_lift") {
+    leg_lift_cmd_state_idx_ = 0;
+    leg_lift_prev_cycle_button_ = false;
+    rt_joy_ptr_ = realtime_tools::RealtimeBuffer<std::shared_ptr<sensor_msgs::msg::Joy>>(nullptr);
+    joy_subscriber_ = get_node()->create_subscription<sensor_msgs::msg::Joy>(
+        "/joy", rclcpp::SystemDefaultsQoS(),
+        [this](const sensor_msgs::msg::Joy::SharedPtr msg) {
+          rt_joy_ptr_.writeFromNonRT(msg);
+        });
+    std::string init_state = leg_lift_cmd_states_.empty() ? "stand" : leg_lift_cmd_states_[0];
+    RCLCPP_INFO(get_node()->get_logger(),
+                "leg_lift activated. Initial command state: %s. Press button 3 (Square) to cycle.",
+                init_state.c_str());
   }
 
   // Initialize the command subscriber
@@ -290,6 +337,7 @@ controller_interface::CallbackReturn NeuralController::on_deactivate(
       realtime_tools::RealtimeBuffer<std::shared_ptr<geometry_msgs::msg::Twist>>(nullptr);
   rt_cmd_pose_ptr_ =
       realtime_tools::RealtimeBuffer<std::shared_ptr<geometry_msgs::msg::Pose>>(nullptr);
+  joy_subscriber_ = nullptr;
 
   for (auto &command_interface : command_interfaces_) {
     command_interface.set_value(0.0);
@@ -470,14 +518,36 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
     observation_.at(3) = (float)projected_gravity_vector[0];
     observation_.at(4) = (float)projected_gravity_vector[1];
     observation_.at(5) = (float)projected_gravity_vector[2];
-    // Velocity commands
-    observation_.at(6) = (float)cmd_x_vel_;
-    observation_.at(7) = (float)cmd_y_vel_;
-    observation_.at(8) = (float)cmd_yaw_vel_;
-    // Orientation commands
-    observation_.at(9) = (float)desired_world_z_in_body_frame_.getX();
-    observation_.at(10) = (float)desired_world_z_in_body_frame_.getY();
-    observation_.at(11) = (float)desired_world_z_in_body_frame_.getZ();
+
+    if (behavior_ == "leg_lift") {
+      // Cycle command state on rising edge of button 3 (Square)
+      auto joy_msg = rt_joy_ptr_.readFromRT();
+      if (joy_msg && joy_msg->get() && static_cast<int>((*joy_msg)->buttons.size()) > 3) {
+        bool cycle_pressed = (*joy_msg)->buttons.at(3) == 1;
+        if (cycle_pressed && !leg_lift_prev_cycle_button_) {
+          leg_lift_cmd_state_idx_ = (leg_lift_cmd_state_idx_ + 1) % leg_lift_num_states_;
+          std::string state_name = leg_lift_cmd_state_idx_ < static_cast<int>(leg_lift_cmd_states_.size())
+                                       ? leg_lift_cmd_states_[leg_lift_cmd_state_idx_]
+                                       : std::to_string(leg_lift_cmd_state_idx_);
+          RCLCPP_INFO(get_node()->get_logger(), "leg_lift command state -> %d (%s)",
+                      leg_lift_cmd_state_idx_, state_name.c_str());
+        }
+        leg_lift_prev_cycle_button_ = cycle_pressed;
+      }
+      // One-hot encode the active command state into obs[6:6+num_states]
+      for (int i = 0; i < leg_lift_num_states_; i++) {
+        observation_.at(6 + i) = (i == leg_lift_cmd_state_idx_) ? 1.0f : 0.0f;
+      }
+    } else {
+      // Velocity commands
+      observation_.at(6) = (float)cmd_x_vel_;
+      observation_.at(7) = (float)cmd_y_vel_;
+      observation_.at(8) = (float)cmd_yaw_vel_;
+      // Orientation commands
+      observation_.at(9) = (float)desired_world_z_in_body_frame_.getX();
+      observation_.at(10) = (float)desired_world_z_in_body_frame_.getY();
+      observation_.at(11) = (float)desired_world_z_in_body_frame_.getZ();
+    }
 
     // Joint positions
     for (int i = 0; i < kActionSize; i++) {
@@ -487,7 +557,7 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
         RCLCPP_DEBUG(get_node()->get_logger(), "Attempting to read joint position for %s (index %d)", params_.joint_names.at(i).c_str(), i);
         float joint_pos =
             state_interfaces_map_.at(params_.joint_names.at(i)).at("position").get().get_value();
-        observation_.at(kJointPositionIdx + i) = joint_pos - params_.default_joint_pos.at(i);
+        observation_.at(joint_pos_obs_idx_ + i) = joint_pos - params_.default_joint_pos.at(i);
       }
     }
   } catch (const std::out_of_range &e) {
@@ -575,7 +645,7 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
 
   // Shift the observation history to the right by kSingleObservationSize for the next control
   // step https://en.cppreference.com/w/cpp/algorithm/rotate
-  std::rotate(observation_.rbegin(), observation_.rbegin() + kSingleObservationSize,
+  std::rotate(observation_.rbegin(), observation_.rbegin() + single_obs_size_,
               observation_.rend());
 
   // Process the actions
@@ -599,7 +669,7 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
     float upper_limit = params_.joint_upper_limits.at(i);
 
     // Copy policy_output to the observation vector
-    observation_.at(kLastActionIdx + i) = fade_in_multiplier * action;
+    observation_.at(last_action_obs_idx_ + i) = fade_in_multiplier * action;
     // Scale and de-normalize to get the action vector
     if (params_.action_types.at(i) == "position") {
       float unclipped = fade_in_multiplier * action * action_scale + default_joint_pos;

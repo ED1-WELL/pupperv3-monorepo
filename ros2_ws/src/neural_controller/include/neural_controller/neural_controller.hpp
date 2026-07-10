@@ -16,6 +16,7 @@
 #include "rclcpp_lifecycle/state.hpp"
 #include "realtime_tools/realtime_buffer.h"
 #include "realtime_tools/realtime_publisher.h"
+#include "sensor_msgs/msg/joy.hpp"
 #include "std_msgs/msg/empty.hpp"
 #include "std_msgs/msg/float32.hpp"
 #include "std_msgs/msg/float32_multi_array.hpp"
@@ -75,6 +76,23 @@ class NeuralController : public controller_interface::ControllerInterface {
                                                 + kActionSize; /* previous action */
   static constexpr int kGravityZIndx = 5;  // Index of gravity z component in the observation
   /* ----------------------------------------------- */
+
+  // Behavior string read from policy JSON (e.g. "leg_lift"). Empty = standard behavior.
+  std::string behavior_ = "";
+
+  // Runtime observation layout — differ from compile-time constants when behavior_ == "leg_lift"
+  int single_obs_size_ = kSingleObservationSize;
+  int joint_pos_obs_idx_ = kJointPositionIdx;
+  int last_action_obs_idx_ = kLastActionIdx;
+
+  // leg_lift command state (one-hot index into command_states from policy JSON)
+  int leg_lift_cmd_state_idx_ = 0;
+  int leg_lift_num_states_ = 1;
+  std::vector<std::string> leg_lift_cmd_states_ = {};
+  bool leg_lift_prev_cycle_button_ = false;  // edge detection for button 3 (Square)
+
+  rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_subscriber_ = nullptr;
+  realtime_tools::RealtimeBuffer<std::shared_ptr<sensor_msgs::msg::Joy>> rt_joy_ptr_;
 
   std::shared_ptr<RTNeural::Model<float>> model_;
 
