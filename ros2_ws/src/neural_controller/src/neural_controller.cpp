@@ -32,8 +32,8 @@ bool NeuralController::check_param_vector_size() {
       {"joint_names", params_.joint_names.size()}};
 
   for (const auto &[name, size] : param_sizes) {
-    if (size != kActionSize) {
-      RCLCPP_ERROR(get_node()->get_logger(), "%s size is %ld, expected %d", name.c_str(), size,
+    if (size != static_cast<size_t>(kActionSize)) {
+      RCLCPP_ERROR(get_node()->get_logger(), "%s size is %zu, expected %d", name.c_str(), size,
                    kActionSize);
       return false;
     }
@@ -67,7 +67,7 @@ controller_interface::CallbackReturn NeuralController::on_init() {
       if (j.find(key) != j.end()) {
         RCLCPP_INFO(get_node()->get_logger(), "From JSON, setting %s vector element-by-element",
                     key.c_str());
-        if (j[key].size() != kActionSize) {
+        if (j[key].size() != static_cast<size_t>(kActionSize)) {
           std::string error_msg = "Invalid size for " + key + " (" + std::to_string(j[key].size()) +
                                   ") != " + std::to_string(kActionSize);
           RCLCPP_ERROR(get_node()->get_logger(), "%s", error_msg.c_str());
@@ -238,7 +238,7 @@ controller_interface::CallbackReturn NeuralController::on_activate(
 
   // Set the gravity z-component in the initial observation vector
   for (int i = 0; i < params_.observation_history; i++) {
-    observation_.at(i * single_obs_size_ + kGravityZIndx) = -1.0;
+    observation_.at(i * single_obs_size_ + kGravityZIndx) = -1.0f;
   }
 
   // For leg_lift, initialize the command one-hot to "stand" (index 0)
@@ -405,9 +405,9 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
   // Get the latest commanded velocities
   auto cmd_vel = rt_cmd_vel_ptr_.readFromRT();
   if (cmd_vel && cmd_vel->get()) {
-    cmd_x_vel_ = cmd_vel->get()->linear.x;
-    cmd_y_vel_ = cmd_vel->get()->linear.y;
-    cmd_yaw_vel_ = cmd_vel->get()->angular.z;
+    cmd_x_vel_ = static_cast<float>(cmd_vel->get()->linear.x);
+    cmd_y_vel_ = static_cast<float>(cmd_vel->get()->linear.y);
+    cmd_yaw_vel_ = static_cast<float>(cmd_vel->get()->angular.z);
   }
 
   // Get the latest commanded pose
@@ -556,7 +556,7 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
       if (params_.action_types.at(i) == "position") {
         RCLCPP_DEBUG(get_node()->get_logger(), "Attempting to read joint position for %s (index %d)", params_.joint_names.at(i).c_str(), i);
         float joint_pos =
-            state_interfaces_map_.at(params_.joint_names.at(i)).at("position").get().get_value();
+            static_cast<float>(state_interfaces_map_.at(params_.joint_names.at(i)).at("position").get().get_value());
         observation_.at(joint_pos_obs_idx_ + i) = joint_pos - params_.default_joint_pos.at(i);
       }
     }
