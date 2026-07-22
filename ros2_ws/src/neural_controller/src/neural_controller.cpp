@@ -246,7 +246,7 @@ controller_interface::CallbackReturn NeuralController::on_activate(
     observation_.at(6) = 1.0f;
   }
 
-  // For leg_lift, subscribe to /joy for command state cycling (button 3 = Square)
+  // For leg_lift, subscribe to /joy for command state cycling (button 1 = O/Circle)
   if (behavior_ == "leg_lift") {
     leg_lift_cmd_state_idx_ = 0;
     leg_lift_prev_cycle_button_ = false;
@@ -258,7 +258,7 @@ controller_interface::CallbackReturn NeuralController::on_activate(
         });
     std::string init_state = leg_lift_cmd_states_.empty() ? "stand" : leg_lift_cmd_states_[0];
     RCLCPP_INFO(get_node()->get_logger(),
-                "leg_lift activated. Initial command state: %s. Press button 3 (Square) to cycle.",
+                "leg_lift activated. Initial command state: %s. Press button 1 (O/Circle) to cycle.",
                 init_state.c_str());
   }
 
@@ -520,10 +520,10 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
     observation_.at(5) = (float)projected_gravity_vector[2];
 
     if (behavior_ == "leg_lift") {
-      // Cycle command state on rising edge of button 3 (Square)
+      // Cycle command state on rising edge of button 1 (O/Circle)
       auto joy_msg = rt_joy_ptr_.readFromRT();
-      if (joy_msg && joy_msg->get() && static_cast<int>((*joy_msg)->buttons.size()) > 3) {
-        bool cycle_pressed = (*joy_msg)->buttons.at(3) == 1;
+      if (joy_msg && joy_msg->get() && static_cast<int>((*joy_msg)->buttons.size()) > 1) {
+        bool cycle_pressed = (*joy_msg)->buttons.at(1) == 1;
         if (cycle_pressed && !leg_lift_prev_cycle_button_) {
           leg_lift_cmd_state_idx_ = (leg_lift_cmd_state_idx_ + 1) % leg_lift_num_states_;
           std::string state_name = leg_lift_cmd_state_idx_ < static_cast<int>(leg_lift_cmd_states_.size())
