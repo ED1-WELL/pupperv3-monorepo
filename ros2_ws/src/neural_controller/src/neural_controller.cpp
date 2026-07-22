@@ -74,7 +74,7 @@ controller_interface::CallbackReturn NeuralController::on_init() {
           throw std::runtime_error(error_msg);
         }
         param.resize(j[key].size(), 0.0);
-        for (int i = 0; i < param.size(); i++) {
+        for (int i = 0; i < static_cast<int>(param.size()); i++) {
           param.at(i) = j[key].at(i);
         }
       }
@@ -393,7 +393,7 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
 
   // After the init_duration has passed, fade in the policy actions
   double time_since_fade_in = (time - init_time_).seconds() - params_.init_duration;
-  float fade_in_multiplier = std::min(time_since_fade_in / params_.fade_in_duration, 1.0);
+  float fade_in_multiplier = static_cast<float>(std::min(time_since_fade_in / params_.fade_in_duration, 1.0));
 
   // Only get a new action from the policy when repeat_action_counter_ is 0
   repeat_action_counter_ += 1;
@@ -511,13 +511,13 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
 
     // Fill the observation vector
     // Angular velocity
-    observation_.at(0) = (float)ang_vel_x;
-    observation_.at(1) = (float)ang_vel_y;
-    observation_.at(2) = (float)ang_vel_z;
+    observation_.at(0) = static_cast<float>(ang_vel_x);
+    observation_.at(1) = static_cast<float>(ang_vel_y);
+    observation_.at(2) = static_cast<float>(ang_vel_z);
     // Projected gravity vector
-    observation_.at(3) = (float)projected_gravity_vector[0];
-    observation_.at(4) = (float)projected_gravity_vector[1];
-    observation_.at(5) = (float)projected_gravity_vector[2];
+    observation_.at(3) = static_cast<float>(projected_gravity_vector[0]);
+    observation_.at(4) = static_cast<float>(projected_gravity_vector[1]);
+    observation_.at(5) = static_cast<float>(projected_gravity_vector[2]);
 
     if (behavior_ == "leg_lift") {
       // Cycle command state on rising edge of button 1 (O/Circle)
@@ -540,13 +540,13 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
       }
     } else {
       // Velocity commands
-      observation_.at(6) = (float)cmd_x_vel_;
-      observation_.at(7) = (float)cmd_y_vel_;
-      observation_.at(8) = (float)cmd_yaw_vel_;
+      observation_.at(6) = static_cast<float>(cmd_x_vel_);
+      observation_.at(7) = static_cast<float>(cmd_y_vel_);
+      observation_.at(8) = static_cast<float>(cmd_yaw_vel_);
       // Orientation commands
-      observation_.at(9) = (float)desired_world_z_in_body_frame_.getX();
-      observation_.at(10) = (float)desired_world_z_in_body_frame_.getY();
-      observation_.at(11) = (float)desired_world_z_in_body_frame_.getZ();
+      observation_.at(9) = static_cast<float>(desired_world_z_in_body_frame_.getX());
+      observation_.at(10) = static_cast<float>(desired_world_z_in_body_frame_.getY());
+      observation_.at(11) = static_cast<float>(desired_world_z_in_body_frame_.getZ());
     }
 
     // Joint positions
@@ -688,7 +688,7 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
     command_interfaces_map_.at(params_.joint_names.at(i))
         .at(params_.action_types.at(i))
         .get()
-        .set_value((double)action_.at(i));
+        .set_value(static_cast<double>(action_.at(i)));
     command_interfaces_map_.at(params_.joint_names.at(i))
         .at("kp")
         .get()
@@ -711,12 +711,12 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
 
   // Publish imu latency
   if (rt_imu_latency_publisher_->trylock()) {
-    rt_imu_latency_publisher_->msg_.data = time_since_measurement_seconds;
+    rt_imu_latency_publisher_->msg_.data = static_cast<float>(time_since_measurement_seconds);
     rt_imu_latency_publisher_->unlockAndPublish();
   }
 
   if (rt_policy_inference_latency_publisher_->trylock()) {
-    rt_policy_inference_latency_publisher_->msg_.data = inference_duration_us / 1000000.0;
+    rt_policy_inference_latency_publisher_->msg_.data = static_cast<float>(inference_duration_us / 1000000.0);
     rt_policy_inference_latency_publisher_->unlockAndPublish();
   }
 
